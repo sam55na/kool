@@ -257,10 +257,10 @@
     
     <div class="result-popup" id="resultPopup">
       <div class="result-content">
-        <h2 style="font-size: 32px;">🎉 مبروك!</h2>
+        <h2 style="font-size: 32px;" id="resultTitle">🎉 مبروك!</h2>
         <p style="font-size: 18px; margin-top: 10px;">لقد فزت بـ:</p>
         <div class="prize-text" id="winPrize"></div>
-        <p style="font-size: 14px; color: #bdbdbd;">سيتم إرسال جائزتك إلى البوت لتفعيلها</p>
+        <p style="font-size: 14px; color: #bdbdbd;" id="resultMessage">سيتم إرسال جائزتك إلى البوت لتفعيلها</p>
         <button class="close-btn" id="closeBtn">إغلاق</button>
       </div>
     </div>
@@ -269,30 +269,24 @@
   <script>
     // ============ إعدادات النظام ============
     // رابط Google Apps Script - استبدله برابط نشرك
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbxzCd4tlMwcR0d5ekSeP1klcjRXKYAOXzdrQajl1jCWrPvGhtYvrrcbF9ku7x27D2JM/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbx6xqOVSft9P7xKfouUem6RRWhEOOt0PfVBF7cr-geWYU4OAwQRwMih0DvY47Wv5Gtx/exec";
     
-    // ============ الجوائز واحتمالاتها (من الملف المرفق) ============
+    // ============ الجوائز واحتمالاتها ============
     const prizes = [
-      { name: "حظ أوفر", probability: 40 }, // 15%
-      { name: "1000", probability: 5 }, // 12%
-      { name: "2000", probability: 2 }, // 11%
-      { name: "5000", probability: 1 }, // 10%
-      { name: "1000", probability: 5 }, // 12%
-      { name: "2000", probability: 2 }, // 10%
-      { name: "5000", probability: 1 }, // 11%
-      { name: "حظ أوفر", probability: 44 } // 9%
+      { name: "حظ أوفر", probability: 40 },
+      { name: "1000", probability: 5 },
+      { name: "2000", probability: 2 },
+      { name: "5000", probability: 1 },
+      { name: "1000", probability: 5 },
+      { name: "2000", probability: 2 },
+      { name: "5000", probability: 1 },
+      { name: "حظ أوفر", probability: 44 }
     ];
     
-    // ألوان العجلة (من الملف المرفق)
+    // ألوان العجلة
     const colors = [
-      "#0d47a1", // أزرق غامق (1)
-      "#ffffff", // أبيض (2)
-      "#0d47a1", // أزرق غامق (3)
-      "#ffffff", // أبيض (4)
-      "#0d47a1", // أزرق غامق (5)
-      "#ffffff", // أبيض (6)
-      "#0d47a1", // أزرق غامق (7)
-      "#ffffff"  // أبيض (8)
+      "#0d47a1", "#ffffff", "#0d47a1", "#ffffff",
+      "#0d47a1", "#ffffff", "#0d47a1", "#ffffff"
     ];
     
     // ============ عناصر DOM ============
@@ -304,6 +298,8 @@
     const resultPopup = document.getElementById('resultPopup');
     const winPrize = document.getElementById('winPrize');
     const closeBtn = document.getElementById('closeBtn');
+    const resultTitle = document.getElementById('resultTitle');
+    const resultMessage = document.getElementById('resultMessage');
     
     // ============ متغيرات عامة ============
     let isSpinning = false;
@@ -313,7 +309,7 @@
     let userId = null;
     
     const prizeCount = prizes.length;
-    const prizeAngle = 360 / prizeCount; // 360 ÷ 8 = 45 درجة لكل قسم
+    const prizeAngle = 360 / prizeCount;
     
     // ============ التحقق من user_id في الرابط ============
     function checkUserIdFromUrl() {
@@ -325,7 +321,6 @@
         return false;
       }
       
-      // تحقق إذا كان user_id رقمياً (chat_id في Telegram)
       const isValidUserId = /^\d+$/.test(userId);
       if (!isValidUserId) {
         showAccessDenied('معرف المستخدم غير صالح');
@@ -362,7 +357,7 @@
       `;
     }
     
-    // ============ إنشاء العجلة (من الملف المرفق) ============
+    // ============ إنشاء العجلة ============
     function createWheel() {
       let cssSlices = [];
       let currentAngle = 0;
@@ -370,7 +365,6 @@
       for (let i = 0; i < prizeCount; i++) {
         const color = colors[i % colors.length];
         const nextAngle = currentAngle + prizeAngle;
-        
         cssSlices.push(`${color} ${currentAngle}deg ${nextAngle}deg`);
         currentAngle = nextAngle;
       }
@@ -378,7 +372,7 @@
       wheel.style.background = `conic-gradient(${cssSlices.join(', ')})`;
     }
     
-    // ============ اختيار الجائزة عشوائياً (من الملف المرفق) ============
+    // ============ اختيار الجائزة عشوائياً ============
     function selectPrize() {
       const rand = Math.random() * 100;
       let cumulativeProbability = 0;
@@ -391,7 +385,7 @@
       return prizes.length - 1;
     }
     
-    // ============ تدوير العجلة (من الملف المرفق مع تعديلات) ============
+    // ============ تدوير العجلة ============
     function spin() {
       if (isSpinning || !canSpin) return;
       
@@ -402,7 +396,7 @@
       const selectedPrizeIndex = selectPrize();
       const prize = prizes[selectedPrizeIndex];
       
-      // حسابات الدوران (من الملف المرفق)
+      // حسابات الدوران
       const randomSpins = Math.floor(Math.random() * 4) + 8;
       const targetAngle = (prizeAngle * selectedPrizeIndex) + (prizeAngle / 2);
       const jitter = (Math.random() - 0.5) * (prizeAngle * 0.8);
@@ -412,25 +406,27 @@
       currentRotation = totalRotation;
       wheel.style.transform = `rotate(${currentRotation}deg)`;
       
-      // عند انتهاء الدوران (من الملف المرفق مع تعديلات)
+      // عند انتهاء الدوران
       wheel.addEventListener('transitionend', function onEnd() {
         isSpinning = false;
         spinAnimation = requestAnimationFrame(updatePrizeDisplay);
         prizeDisplay.textContent = prize.name;
         
-        if (prize.name !== "حظ أوفر") {
-          saveResult(prize.name);
-          setTimeout(() => showResult(prize.name), 600);
+        // حفظ جميع النتائج (بما فيها حظ أوفر)
+        saveResult(prize.name);
+        
+        // عرض النتيجة المناسبة
+        if (prize.name === "حظ أوفر") {
+          showResult("حظ أوفر", false);
         } else {
-          showResult("حظ أوفر في المرة القادمة!");
-          setTimeout(() => updateUI(false, new Date().getTime()), 2500);
+          showResult(prize.name, true);
         }
         
         wheel.removeEventListener('transitionend', onEnd);
       }, { once: true });
     }
     
-    // ============ عرض الجائزة أثناء الدوران (من الملف المرفق) ============
+    // ============ عرض الجائزة أثناء الدوران ============
     function updatePrizeDisplay() {
       if (!isSpinning) {
         cancelAnimationFrame(spinAnimation);
@@ -446,7 +442,6 @@
         const b = parseFloat(matrix[1]);
         const angle = Math.round(Math.atan2(b, a) * (180 / Math.PI));
         
-        // تصحيح الزاوية للحصول على الجائزة الصحيحة
         const correctedAngle = (360 - angle % 360 + prizeAngle / 2) % 360;
         const prizeIndex = Math.floor(correctedAngle / prizeAngle);
         
@@ -463,7 +458,7 @@
       try {
         console.log('💾 محاولة حفظ النتيجة:', { userId, prize });
         
-        // إرسال الطلب إلى Google Apps Script باستخدام GET لتجنب مشاكل CORS
+        // إرسال الطلب إلى Google Apps Script
         const gasUrl = GAS_URL + 
           '?action=save_spin' +
           '&user_id=' + encodeURIComponent(userId) +
@@ -472,16 +467,27 @@
         
         console.log('📡 إرسال طلب إلى:', gasUrl);
         
-        // استخدام fetch مع no-cors
-        await fetch(gasUrl, {
+        // استخدام fetch مع mode 'cors'
+        const response = await fetch(gasUrl, {
           method: 'GET',
-          mode: 'no-cors'
+          mode: 'cors',
+          headers: {
+            'Content-Type': 'application/json'
+          }
         });
         
-        console.log('✅ تم إرسال طلب الحفظ');
+        if (!response.ok) {
+          throw new Error('فشل في استجابة الخادم');
+        }
+        
+        const data = await response.json();
+        console.log('✅ استجابة الخادم:', data);
+        
+        return data.success;
         
       } catch (error) {
         console.error('❌ خطأ في حفظ النتيجة:', error);
+        return false;
       }
     }
     
@@ -490,43 +496,41 @@
       try {
         console.log('🔍 التحقق من إمكانية الدوران للمستخدم:', userId);
         
-        // إرسال طلب التحقق إلى Google Apps Script
         const gasUrl = GAS_URL + 
           '?action=check_user' +
           '&user_id=' + encodeURIComponent(userId);
         
         console.log('📡 إرسال طلب إلى:', gasUrl);
         
-        // استخدام fetch مع no-cors
-        await fetch(gasUrl, {
+        const response = await fetch(gasUrl, {
           method: 'GET',
-          mode: 'no-cors'
+          mode: 'cors',
+          headers: {
+            'Content-Type': 'application/json'
+          }
         });
         
-        console.log('✅ تم إرسال طلب التحقق');
+        if (!response.ok) {
+          throw new Error('فشل في استجابة الخادم');
+        }
         
-        // في التطبيق الحقيقي، سننتظر الرد من GAS
-        // ولكن للاختبار، سنستخدم استجابة وهمية
-        setTimeout(() => {
-          // محاكاة استجابة من الخادم
-          const mockResponse = {
-            success: true,
-            canSpin: true, // غير هذا إلى false لاختبار النظام
-            lastTime: null
-          };
-          
-          console.log('📨 استجابة افتراضية:', mockResponse);
-          updateUI(mockResponse.canSpin, mockResponse.lastTime);
-        }, 1000);
+        const data = await response.json();
+        console.log('📨 استجابة الخادم:', data);
+        
+        if (data.success) {
+          updateUI(data.canSpin, data.lastTime);
+        } else {
+          console.error('❌ فشل في التحقق من المستخدم:', data.message);
+          updateUI(true, null); // السماح بالدوران في حالة الخطأ
+        }
         
       } catch (error) {
         console.error('❌ خطأ في التحقق:', error);
-        // في حالة الخطأ، اسمح بالدوران لمنع تعطيل التجربة
-        updateUI(true, null);
+        updateUI(true, null); // السماح بالدوران في حالة الخطأ
       }
     }
     
-    // ============ تحديث واجهة المستخدم (من الملف المرفق مع تعديلات) ============
+    // ============ تحديث واجهة المستخدم ============
     function updateUI(canSpinNow, lastTime) {
       canSpin = canSpinNow;
       
@@ -543,7 +547,7 @@
       }
     }
     
-    // ============ المؤقت للدوران التالي (من الملف المرفق) ============
+    // ============ المؤقت للدوران التالي ============
     function startTimer(lastTime) {
       const targetTime = lastTime + (24 * 60 * 60 * 1000);
       
@@ -564,13 +568,26 @@
       }, 1000);
     }
     
-    // ============ عرض نتيجة الفوز (من الملف المرفق) ============
-    function showResult(prize) {
+    // ============ عرض نتيجة الفوز ============
+    function showResult(prize, isWinningPrize = false) {
       winPrize.textContent = prize;
+      
+      if (isWinningPrize) {
+        resultTitle.textContent = "🎉 مبروك!";
+        resultTitle.style.color = "#fdd835";
+        resultMessage.textContent = "سيتم إرسال جائزتك إلى البوت لتفعيلها";
+        winPrize.style.color = "#fdd835";
+      } else {
+        resultTitle.textContent = "😔 حظ أوفر";
+        resultTitle.style.color = "#b0b0b0";
+        resultMessage.textContent = "حاول مرة أخرى غداً!";
+        winPrize.style.color = "#b0b0b0";
+      }
+      
       resultPopup.classList.add('show');
     }
     
-    // ============ إغلاق النافذة المنبثقة (من الملف المرفق) ============
+    // ============ إغلاق النافذة المنبثقة ============
     function closeResult() {
       resultPopup.classList.remove('show');
       updateUI(false, new Date().getTime());
@@ -581,7 +598,7 @@
       }
     }
     
-    // ============ تهيئة التطبيق (من الملف المرفق مع تعديلات) ============
+    // ============ تهيئة التطبيق ============
     async function init() {
       // التحقق من user_id
       if (!checkUserIdFromUrl()) {
