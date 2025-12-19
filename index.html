@@ -31,6 +31,7 @@
         }
         .wheel {
             width: 100%; height: 100%; border-radius: 50%; position: relative; overflow: hidden;
+            transition: transform 6s cubic-bezier(0.33, 1, 0.68, 1);
             box-shadow: 0 0 30px rgba(0,0,0,0.8), inset 0 0 25px rgba(0,0,0,0.6);
             border: 4px solid #444;
         }
@@ -98,7 +99,7 @@
         </div>
         <div class="wheel-container">
             <div class="pointer"></div>
-            <canvas id="wheel" class="wheel" width="600" height="600" style="width: 300px; height: 300px; transform: rotate(0deg);"></canvas>
+            <canvas id="wheel" width="600" height="600" style="width: 300px; height: 300px;"></canvas>
             <div class="wheel-center" id="prizeDisplay">?</div>
         </div>
         <button class="spin-btn" id="spinBtn" disabled></button>
@@ -151,6 +152,7 @@
         let userId = null;
         let isSpinning = false;
         let canSpin = false;
+        let currentRotation = 0;
         let timerInterval = null;
 
         // --- وظائف الواجهة ---
@@ -197,7 +199,7 @@
             try {
                 const response = await fetch(API_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // لتجنب طلب CORS preflight
                     body: JSON.stringify({ action, ...payload })
                 });
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -216,33 +218,55 @@
             if (data) {
                 updateUI(data.canSpin, data.lastTime);
             } else {
+                // في حالة فشل الاتصال، اسمح بالتدوير لتجنب حظر المستخدم
                 updateUI(true, null);
             }
         };
 
-        // --- وظائف منطق اللعبة ---
-        const spin = async () => {
+        // --- وظائف الدوران (المعدلة) ---
+        const spin = () => {
             if (isSpinning || !canSpin) return;
 
             isSpinning = true;
-            updateUI(false, null);
+            updateUI(false, null); // تعطيل الزر فوراً
 
             const selectedPrizeIndex = selectPrize();
             const prize = prizes[selectedPrizeIndex];
             
+            // ====================================================================
+            // التعديل: حساب زاوية التوقف الصحيحة
+            // ====================================================================
             const prizeCount = prizes.length;
-            const prizeAngle = 360 / prizeCount;
-            const targetAngle = (prizeAngle * selectedPrizeIndex) + (prizeAngle / 2);
-            const jitter = (Math.random() - 0.5) * (prizeAngle * 0.8);
+            const prizeAngle = 360 / prizeCount; // زاوية كل قطاع (45 درجة)
             
-            // التصحيح الرئيسي: نطرح 90 درجة لمواءمة الزاوية مع المؤشر العلوي
-            const finalAngle = targetAngle + jitter - 90;
+            // زاوية بداية القطاع الفائز (بالدرجات، من اليمين وعكس عقارب الساعة)
+            const startAngleOfPrize = selectedPrizeIndex * prizeAngle;
+            
+            // زاوية منتصف القطاع الفائز
+            const centerAngleOfPrize = startAngleOfPrize + (prizeAngle / 2);
+            
+            // الزاوية التي يجب أن تدورها العجلة لكي يصبح منتصف القطاع الفائز عند المؤشر (أعلى العجلة = 90 درجة)
+            let rotationToAlign = 90 - centerAngleOfPrize;
+            
+            // إذا كانت الزاوية سالبة، أضف 360 لجعلها موجبة
+            if (rotationToAlign < 0) {
+                rotationToAlign += 360;
+            }
+            
+            // إضافة دورات كاملة لضمان الدوران الكافي
+            const fullSpins = 8; // عدد الدورات الكاملة
+            const totalRotation = (fullSpins * 360) + rotationToAlign;
+            
+            // إضافة تذبذب بسيط لتبدو الحركة طبيعية أكثر (اختياري)
+            const jitter = (Math.random() - 0.5) * (prizeAngle * 0.4); // تذبذب بحدود 40% من زاوية القطاع
+            const finalRotation = totalRotation + jitter;
+            
+            // ====================================================================
+            // نهاية التعديل
+            // ====================================================================
 
-            const randomSpins = (Math.floor(Math.random() * 4) + 8) * 360;
-            const totalRotation = randomSpins + finalAngle;
-
-            elements.wheel.style.transition = 'transform 6s cubic-bezier(0.22, 1, 0.36, 1)';
-            elements.wheel.style.transform = `rotate(${totalRotation}deg)`;
+            elements.wheel.style.transition = 'transform 6s cubic-bezier(0.33, 1, 0.68, 1)';
+            elements.wheel.style.transform = `rotate(${finalRotation}deg)`;
 
             elements.wheel.addEventListener('transitionend', () => onSpinEnd(prize.name), { once: true });
         };
@@ -261,7 +285,7 @@
                 showResult(finalPrize);
             } else {
                 showError("حدث خطأ أثناء حفظ نتيجتك. يرجى المحاولة مرة أخرى لاحقًا.");
-                updateUI(true, null);
+                updateUI(true, null); // السماح للمستخدم بالمحاولة مرة أخرى
             }
         };
 
@@ -330,7 +354,7 @@
         // --- التهيئة ---
         const init = async () => {
             showLoading("جاري تهيئة التطبيق...");
-            drawWheel();
+            drawWheel(); // رسم العجلة باستخدام Canvas
 
             try {
                 if (window.Telegram && window.Telegram.WebApp) {
