@@ -309,22 +309,23 @@ body {
 // ===============================================================
 
 // --- الإعدادات الرئيسية ---
-// هام: استبدل هذا بالرابط الجديد بعد نشر Google Apps Script
 const API_URL = "https://script.google.com/macros/s/AKfycbz2-PqoTR5QJlwj7UYAlMzAeoLdiffT1Tl6LsY3EXcmvMAyrA6QVARPLzcN-avLNzqxpA/exec";
 
 // الجوائز مع الاحتمالات (كل جائزة مكررة مرتين)
+// التوزيع الصحيح: حظ أوفر 44%، 1000: 10%، 2000: 4%، 5000: 2%
 const prizes = [
     { name: "حظ أوفر", probability: 44 },
     { name: "حظ أوفر", probability: 44 },
-    { name: "1000", probability: 5 },
-    { name: "1000", probability: 5 },
-    { name: "2000", probability: 2 },
-    { name: "2000", probability: 2 },
-    { name: "5000", probability: 1 },
-    { name: "5000", probability: 1 }
+    { name: "1000", probability: 10 },
+    { name: "1000", probability: 10 },
+    { name: "2000", probability: 4 },
+    { name: "2000", probability: 4 },
+    { name: "5000", probability: 2 },
+    { name: "5000", probability: 2 }
 ];
+// المجموع: 120 (سيتم التعامل معه في selectPrize)
 
-// الألوان للعجلة
+// الألوان للعجلة (8 ألوان لـ 8 قطاعات)
 const colors = ["#0d47a1", "#1565c0", "#1976d2", "#1e88e5", "#2196f3", "#42a5f5", "#64b5f6", "#90caf9"];
 
 // --- عناصر DOM ---
@@ -352,6 +353,7 @@ let isSpinning = false;
 let canSpin = false;
 let currentRotation = 0;
 let timerInterval = null;
+let selectedPrizeIndex = 0;
 
 // --- وظائف الواجهة ---
 const showLoading = (text) => {
@@ -379,8 +381,11 @@ const drawWheel = () => {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     
+    // رسم القطاعات
     for (let i = 0; i < prizeCount; i++) {
         const angle = i * prizeAngle;
+        
+        // رسم القطاع
         ctx.fillStyle = colors[i % colors.length];
         ctx.beginPath();
         ctx.moveTo(300, 300);
@@ -388,13 +393,23 @@ const drawWheel = () => {
         ctx.closePath();
         ctx.fill();
         
+        // رسم النص في منتصف القطاع
         ctx.save();
-        ctx.fillStyle = (ctx.fillStyle === '#ffffff') ? '#0d47a1' : '#ffffff';
+        ctx.fillStyle = '#ffffff'; // نص أبيض
         ctx.translate(300 + 200 * Math.cos(angle + prizeAngle / 2), 300 + 200 * Math.sin(angle + prizeAngle / 2));
         ctx.rotate(angle + prizeAngle / 2 + Math.PI / 2);
         ctx.fillText(prizes[i].name, 0, 0);
         ctx.restore();
     }
+    
+    // رسم مركز العجلة
+    ctx.fillStyle = '#212121';
+    ctx.beginPath();
+    ctx.arc(300, 300, 40, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.strokeStyle = '#424242';
+    ctx.lineWidth = 4;
+    ctx.stroke();
 };
 
 // --- وظائف الاتصال بالخادم ---
@@ -429,28 +444,60 @@ const checkUserStatus = async () => {
 };
 
 // --- وظائف منطق اللعبة ---
+const selectPrize = () => {
+    const totalProbability = 120; // مجموع الاحتمالات (44+44+10+10+4+4+2+2)
+    const rand = Math.random() * totalProbability;
+    let cumulativeProbability = 0;
+    
+    for (let i = 0; i < prizes.length; i++) {
+        cumulativeProbability += prizes[i].probability;
+        if (rand <= cumulativeProbability) {
+            selectedPrizeIndex = i;
+            return i;
+        }
+    }
+    
+    selectedPrizeIndex = prizes.length - 1;
+    return selectedPrizeIndex;
+};
+
 const spin = async () => {
     if (isSpinning || !canSpin) return;
     
     isSpinning = true;
     updateUI(false, null);
     
-    const selectedPrizeIndex = selectPrize();
-    const prize = prizes[selectedPrizeIndex];
+    const index = selectPrize();
+    const prize = prizes[index];
     
-    const prizeAngle = 360 / prizes.length;
-    // زاوية منتصف القطاع
-    const targetAngle = prizeAngle * selectedPrizeIndex + prizeAngle / 2;
-    // دوران إضافي لجعل العجلة تدور عدة مرات
-    const randomSpins = Math.floor(Math.random() * 4) + 8;
-    // الزاوية النهائية مع تعويض الدوران العكسي
-    const finalAngle = 360 - targetAngle;
-    // الدوران الكلي
-    const totalRotation = (randomSpins * 360) + finalAngle;
+    // معلومات العجلة
+    const totalPrizes = prizes.length;
+    const sectorAngle = 360 / totalPrizes;
     
+    // حساب الزاوية النهائية بدقة
+    // المؤشر في الأعلى (0 درجة)، لكن Canvas يبدأ من اليمين (90 درجة فرق)
+    // نحتاج لجعل القطاع المختار يصل إلى المؤشر في الأعلى
+    
+    // زاوية بداية القطاع المختار
+    const startAngle = index * sectorAngle;
+    
+    // نريد منتصف القطاع ليصل إلى المؤشر (المؤشر في 270 درجة بالنسبة للـ Canvas)
+    // الصيغة: (360 - (منتصف القطاع + 90)) + دورات كاملة
+    const middleAngle = startAngle + (sectorAngle / 2);
+    
+    // لأن العجلة تدور باتجاه عقارب الساعة، نحتاج لعكس الزاوية
+    // نريد أن ينتهي الدوران عند 270 درجة (أعلى المركز)
+    const targetAngle = 270 - middleAngle;
+    
+    // عدد الدورات الكاملة + الزاوية النهائية
+    const spinCount = Math.floor(Math.random() * 4) + 8;
+    const totalRotation = (spinCount * 360) + targetAngle;
+    
+    // تطبيق الدوران
     elements.wheel.style.transition = 'transform 6s cubic-bezier(0.33, 1, 0.68, 1)';
     elements.wheel.style.transform = `rotate(${totalRotation}deg)`;
     
+    // عند انتهاء الدوران
     elements.wheel.addEventListener('transitionend', () => onSpinEnd(prize.name), { once: true });
 };
 
@@ -475,18 +522,6 @@ const onSpinEnd = async (finalPrize) => {
     }
 };
 
-const selectPrize = () => {
-    const rand = Math.random() * 100;
-    let cumulativeProbability = 0;
-    
-    for (let i = 0; i < prizes.length; i++) {
-        cumulativeProbability += prizes[i].probability;
-        if (rand <= cumulativeProbability) return i;
-    }
-    
-    return prizes.length - 1;
-};
-
 const showResult = (prize) => {
     elements.winPrize.textContent = prize;
     elements.resultPopup.classList.add('show');
@@ -495,12 +530,14 @@ const showResult = (prize) => {
 const closeResult = () => {
     elements.resultPopup.classList.remove('show');
     
-    if (finalPrize === "حظ أوفر") {
+    // إذا كانت الجائزة "حظ أوفر"، تحديث الواجهة مباشرة
+    if (elements.winPrize.textContent === "حظ أوفر") {
         setTimeout(() => {
             updateUI(false, new Date().getTime());
         }, 500);
     }
     
+    // إغلاق تطبيق Telegram إذا كان يعمل داخله
     if (window.Telegram && window.Telegram.WebApp) {
         setTimeout(() => {
             window.Telegram.WebApp.close();
