@@ -223,7 +223,7 @@
             }
         };
 
-        // --- وظائف الدوران (المعدلة) ---
+        // --- وظائف الدوران (المعدلة لتصحيح الزاوية) ---
         const spin = () => {
             if (isSpinning || !canSpin) return;
 
@@ -234,39 +234,44 @@
             const prize = prizes[selectedPrizeIndex];
             
             // ====================================================================
-            // التعديل: حساب زاوية التوقف الصحيحة
+            // التعديل: تصحيح حساب زاوية التوقف
             // ====================================================================
             const prizeCount = prizes.length;
             const prizeAngle = 360 / prizeCount; // زاوية كل قطاع (45 درجة)
             
-            // زاوية بداية القطاع الفائز (بالدرجات، من اليمين وعكس عقارب الساعة)
-            const startAngleOfPrize = selectedPrizeIndex * prizeAngle;
-            
-            // زاوية منتصف القطاع الفائز
-            const centerAngleOfPrize = startAngleOfPrize + (prizeAngle / 2);
+            // زاوية منتصف القطاع الفائز (بالدرجات، من اليمين وعكس عقارب الساعة)
+            const centerAngleOfPrize = (selectedPrizeIndex * prizeAngle) + (prizeAngle / 2);
             
             // الزاوية التي يجب أن تدورها العجلة لكي يصبح منتصف القطاع الفائز عند المؤشر (أعلى العجلة = 90 درجة)
-            let rotationToAlign = 90 - centerAngleOfPrize;
+            // الدوران يكون في اتجاه عقارب الساعة (قيمة موجبة لـ rotate)
+            // الزاوية المطلوبة = 450 - centerAngleOfPrize
+            let rotationToAlign = 450 - centerAngleOfPrize;
             
-            // إذا كانت الزاوية سالبة، أضف 360 لجعلها موجبة
-            if (rotationToAlign < 0) {
-                rotationToAlign += 360;
-            }
+            // إضافة إزاحة إضافية بمقدار نصف قطاع (22.5 درجة) لتعويض أي فرق في المحاذاة
+            // بناءً على الصورة، يبدو أن المؤشر يشير إلى منتصف الحد الفاصل بين القطاعات
+            // لكن بما أننا نريد أن يتوقف على منتصف القطاع، سنعتمد على الحساب الرياضي الصحيح
+            // وإذا استمرت المشكلة، سنضيف إزاحة تجريبية.
+            
+            // لنقم بتجربة إزاحة 45 درجة (قطاع كامل) للتأكد من الاتجاه
+            // rotationToAlign = rotationToAlign + 45; // تجربة إزاحة
+            
+            // تأكد من أن الزاوية ضمن نطاق 0-360
+            rotationToAlign = rotationToAlign % 360;
             
             // إضافة دورات كاملة لضمان الدوران الكافي
             const fullSpins = 8; // عدد الدورات الكاملة
-            const totalRotation = (fullSpins * 360) + rotationToAlign;
+            const finalRotation = (fullSpins * 360) + rotationToAlign;
             
             // إضافة تذبذب بسيط لتبدو الحركة طبيعية أكثر (اختياري)
             const jitter = (Math.random() - 0.5) * (prizeAngle * 0.4); // تذبذب بحدود 40% من زاوية القطاع
-            const finalRotation = totalRotation + jitter;
+            const totalRotation = finalRotation + jitter;
             
             // ====================================================================
             // نهاية التعديل
             // ====================================================================
 
             elements.wheel.style.transition = 'transform 6s cubic-bezier(0.33, 1, 0.68, 1)';
-            elements.wheel.style.transform = `rotate(${finalRotation}deg)`;
+            elements.wheel.style.transform = `rotate(${totalRotation}deg)`;
 
             elements.wheel.addEventListener('transitionend', () => onSpinEnd(prize.name), { once: true });
         };
