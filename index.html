@@ -235,45 +235,77 @@
             margin-top: 15px;
         }
         
-        .loading {
-            display: none;
+        /* تحسين شاشة التحميل */
+        .loading-overlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.7);
-            z-index: 2000;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
         }
         
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid #fdd835;
+        .loading-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .loader {
+            width: 80px;
+            height: 80px;
+            border: 5px solid rgba(253, 216, 53, 0.3);
             border-radius: 50%;
+            border-top: 5px solid var(--primary-color);
             animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        
+        .loading-text {
+            color: var(--primary-color);
+            font-size: 18px;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(253, 216, 53, 0.5);
         }
         
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        .error-message {
+            background: rgba(244, 67, 54, 0.1);
+            border: 1px solid #f44336;
+            color: #ff8a80;
+            padding: 10px;
+            border-radius: 10px;
+            margin: 10px 0;
+            display: none;
+        }
     </style>
 </head>
 <body>
-    <!-- شاشة التحميل -->
-    <div class="loading" id="loading">
-        <div class="spinner"></div>
+    <!-- شاشة التحميل المحسنة -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loader"></div>
+        <div class="loading-text" id="loadingText">جاري التحميل...</div>
     </div>
+    
+    <!-- رسالة الخطأ -->
+    <div class="error-message" id="errorMessage"></div>
     
     <!-- الواجهة الرئيسية -->
     <div class="container">
         <div class="header">
-            <div class="status" id="status">جاري التحميل...</div>
+            <div class="status" id="status">جاري التحقق من الحالة...</div>
             <div class="timer" id="timer"></div>
         </div>
         
@@ -283,7 +315,7 @@
             <div class="wheel-center" id="prizeDisplay">?</div>
         </div>
         
-        <button class="spin-btn" id="spinBtn" disabled>جاري التحميل...</button>
+        <button class="spin-btn" id="spinBtn" disabled>جاري التحقق...</button>
     </div>
     
     <!-- نافذة النتيجة -->
@@ -300,8 +332,8 @@
     </div>
 
     <script>
-        // تكوين API endpoint (استبدل بمسار نشر Google Apps Script الخاص بك)
-        const API_URL = "https://script.google.com/macros/s/AKfycbx8n2MBMr09hEtzuAM_E1E9sEXIljSAHn_E6aSWIPUP0fxno_ELPM6mV4SIpXts4ar-/exec";
+        // استبدل هذا بـ URL نشر Google Apps Script الخاص بك
+        const API_URL = "https://script.google.com/macros/s/AKfycbzZUd5uoT3MhQy97f5yc35BT0DD4Ifko04zmRW500SKhwIIQ0JfkGb_WH6iXxiLZm18/exec";
         
         // تعريف الجوائز
         const prizes = [
@@ -322,16 +354,20 @@
         ];
         
         // عناصر DOM
-        const wheel = document.getElementById('wheel');
-        const prizeDisplay = document.getElementById('prizeDisplay');
-        const spinBtn = document.getElementById('spinBtn');
-        const timerEl = document.getElementById('timer');
-        const statusEl = document.getElementById('status');
-        const resultPopup = document.getElementById('resultPopup');
-        const winPrize = document.getElementById('winPrize');
-        const closeBtn = document.getElementById('closeBtn');
-        const loadingEl = document.getElementById('loading');
-        const resultMessage = document.getElementById('resultMessage');
+        const elements = {
+            wheel: document.getElementById('wheel'),
+            prizeDisplay: document.getElementById('prizeDisplay'),
+            spinBtn: document.getElementById('spinBtn'),
+            timerEl: document.getElementById('timer'),
+            statusEl: document.getElementById('status'),
+            resultPopup: document.getElementById('resultPopup'),
+            winPrize: document.getElementById('winPrize'),
+            closeBtn: document.getElementById('closeBtn'),
+            loadingOverlay: document.getElementById('loadingOverlay'),
+            loadingText: document.getElementById('loadingText'),
+            errorMessage: document.getElementById('errorMessage'),
+            resultMessage: document.getElementById('resultMessage')
+        };
         
         // متغيرات حالة
         let userId = null;
@@ -343,6 +379,27 @@
         // تكوين العجلة
         const prizeCount = prizes.length;
         const prizeAngle = 360 / prizeCount;
+        
+        // ===== وظائف المساعدة =====
+        
+        // إظهار/إخفاء التحميل
+        function showLoading(text = "جاري التحميل...") {
+            elements.loadingText.textContent = text;
+            elements.loadingOverlay.classList.add('show');
+        }
+        
+        function hideLoading() {
+            elements.loadingOverlay.classList.remove('show');
+        }
+        
+        // إظهار خطأ
+        function showError(message) {
+            elements.errorMessage.textContent = message;
+            elements.errorMessage.style.display = 'block';
+            setTimeout(() => {
+                elements.errorMessage.style.display = 'none';
+            }, 5000);
+        }
         
         // إنشاء العجلة
         function createWheel() {
@@ -356,10 +413,10 @@
                 currentAngle = nextAngle;
             }
             
-            wheel.style.background = `conic-gradient(${cssSlices.join(', ')})`;
+            elements.wheel.style.background = `conic-gradient(${cssSlices.join(', ')})`;
         }
         
-        // تحديد الجائزة من الزاوية
+        // الحصول على الجائزة من الزاوية
         function getPrizeFromAngle(angle) {
             const correctedAngle = (360 - angle % 360 + prizeAngle / 2) % 360;
             const prizeIndex = Math.floor(correctedAngle / prizeAngle);
@@ -373,7 +430,7 @@
                 return;
             }
             
-            const transformMatrix = window.getComputedStyle(wheel).getPropertyValue('transform');
+            const transformMatrix = window.getComputedStyle(elements.wheel).getPropertyValue('transform');
             const matrixValues = transformMatrix.match(/matrix\((.+)\)/);
             
             if (matrixValues) {
@@ -381,13 +438,13 @@
                 const a = parseFloat(matrix[0]);
                 const b = parseFloat(matrix[1]);
                 const angle = Math.round(Math.atan2(b, a) * (180 / Math.PI));
-                prizeDisplay.textContent = getPrizeFromAngle(angle);
+                elements.prizeDisplay.textContent = getPrizeFromAngle(angle);
             }
             
             spinAnimation = requestAnimationFrame(updatePrizeDisplay);
         }
         
-        // اختيار جائزة عشوائية بناءً على الاحتمالات
+        // اختيار جائزة بناءً على الاحتمالات
         function selectPrize() {
             const rand = Math.random() * 100;
             let cumulativeProbability = 0;
@@ -400,14 +457,91 @@
             return prizes.length - 1;
         }
         
+        // ===== وظائف التحقق والحفظ =====
+        
+        // التحقق من حالة المستخدم
+        async function checkUserStatus() {
+            showLoading("جاري التحقق من حالتك...");
+            
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'check_user',
+                        user_id: userId
+                    })
+                });
+                
+                const data = await response.json();
+                console.log("Check user response:", data);
+                
+                updateUI(data.canSpin, data.lastTime);
+                hideLoading();
+                
+            } catch (error) {
+                console.error('Error checking user:', error);
+                showError("خطأ في الاتصال بالخادم");
+                updateUI(true, null);
+                hideLoading();
+            }
+        }
+        
+        // حفظ النتيجة
+        async function saveResult(prize) {
+            showLoading("جاري حفظ النتيجة...");
+            
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'save_spin',
+                        user_id: userId,
+                        prize: prize
+                    })
+                });
+                
+                const data = await response.json();
+                console.log("Save result response:", data);
+                
+                if (data.success) {
+                    console.log("Result saved successfully");
+                } else {
+                    showError("خطأ في حفظ النتيجة: " + data.message);
+                }
+                
+                hideLoading();
+                return data.success;
+                
+            } catch (error) {
+                console.error('Error saving result:', error);
+                showError("خطأ في حفظ النتيجة");
+                hideLoading();
+                return false;
+            }
+        }
+        
+        // ===== وظائف العجلة =====
+        
         // تدوير العجلة
-        function spin() {
+        async function spin() {
             if (isSpinning || !canSpin) return;
             
-            showLoading();
+            // التحقق النهائي قبل التدوير
+            await checkUserStatus();
+            if (!canSpin) {
+                showError("لا يمكنك التدوير الآن");
+                return;
+            }
+            
             isSpinning = true;
-            spinBtn.disabled = true;
-            spinBtn.textContent = "جاري التدوير...";
+            elements.spinBtn.disabled = true;
+            elements.spinBtn.textContent = "جاري التدوير...";
             
             const selectedPrizeIndex = selectPrize();
             const prize = prizes[selectedPrizeIndex];
@@ -418,50 +552,46 @@
             const totalRotation = (randomSpins * 360) + finalAngle;
             
             currentRotation = totalRotation;
-            wheel.style.transform = `rotate(${currentRotation}deg)`;
+            elements.wheel.style.transform = `rotate(${currentRotation}deg)`;
             
             spinAnimation = requestAnimationFrame(updatePrizeDisplay);
             
-            wheel.addEventListener('transitionend', () => onSpinEnd(prize.name), { once: true });
+            elements.wheel.addEventListener('transitionend', () => onSpinEnd(prize.name), { once: true });
         }
         
         // بعد انتهاء الدوران
-        function onSpinEnd(finalPrize) {
+        async function onSpinEnd(finalPrize) {
             isSpinning = false;
             cancelAnimationFrame(spinAnimation);
-            prizeDisplay.textContent = finalPrize;
+            elements.prizeDisplay.textContent = finalPrize;
             
             // حفظ النتيجة في الخلفية
-            saveResult(finalPrize);
+            const saved = await saveResult(finalPrize);
             
-            // إذا كانت الجائزة "حظ أوفر"
             if (finalPrize === "حظ أوفر") {
-                resultMessage.textContent = "حظ أوفر في المرة القادمة!";
+                elements.resultMessage.textContent = "حظ أوفر في المرة القادمة!";
                 setTimeout(() => {
                     updateUI(false, new Date().getTime());
-                    hideLoading();
                 }, 1500);
-            } else {
-                resultMessage.textContent = "سيتم إرسال جائزتك إلى البوت لتفعيلها";
+            } else if (saved) {
+                elements.resultMessage.textContent = "سيتم إرسال جائزتك إلى البوت لتفعيلها";
                 setTimeout(() => {
                     showResult(finalPrize);
-                    hideLoading();
                 }, 600);
             }
         }
         
-        // عرض نافذة النتيجة
+        // عرض النتيجة
         function showResult(prize) {
-            winPrize.textContent = prize;
-            resultPopup.classList.add('show');
+            elements.winPrize.textContent = prize;
+            elements.resultPopup.classList.add('show');
         }
         
-        // إغلاق نافذة النتيجة
+        // إغلاق النتيجة
         function closeResult() {
-            resultPopup.classList.remove('show');
+            elements.resultPopup.classList.remove('show');
             updateUI(false, new Date().getTime());
             
-            // إغلاق التطبيق بعد ثانية
             setTimeout(() => {
                 if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
                     Telegram.WebApp.close();
@@ -469,41 +599,20 @@
             }, 1000);
         }
         
-        // حفظ النتيجة في الخلفية
-        function saveResult(prize) {
-            fetch(API_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    action: 'save_spin',
-                    user_id: userId,
-                    prize: prize
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log('Result saved:', data);
-            })
-            .catch(error => {
-                console.error('Error saving result:', error);
-            });
-        }
+        // ===== تحديث الواجهة =====
         
-        // تحديث واجهة المستخدم
         function updateUI(canSpinNow, lastTime) {
             canSpin = canSpinNow;
             
             if (canSpinNow) {
-                spinBtn.disabled = false;
-                spinBtn.textContent = "دور العجلة";
-                statusEl.textContent = "عجلة الحظ اليومية";
-                timerEl.textContent = "";
+                elements.spinBtn.disabled = false;
+                elements.spinBtn.textContent = "دور العجلة";
+                elements.statusEl.textContent = "عجلة الحظ اليومية";
+                elements.timerEl.textContent = "";
             } else {
-                spinBtn.disabled = true;
-                spinBtn.textContent = "ارجع غداً";
-                statusEl.textContent = "لقد قمت بالتدوير بالفعل اليوم";
+                elements.spinBtn.disabled = true;
+                elements.spinBtn.textContent = "ارجع غداً";
+                elements.statusEl.textContent = "لقد قمت بالتدوير بالفعل اليوم";
                 if (lastTime) startTimer(lastTime);
             }
         }
@@ -512,11 +621,11 @@
         function startTimer(lastTime) {
             const targetTime = lastTime + (24 * 60 * 60 * 1000);
             
-            const interval = setInterval(() => {
+            const updateTimer = () => {
                 const timeLeft = targetTime - Date.now();
                 
                 if (timeLeft <= 0) {
-                    clearInterval(interval);
+                    elements.timerEl.textContent = "";
                     updateUI(true, null);
                     return;
                 }
@@ -525,73 +634,57 @@
                 const m = Math.floor((timeLeft % 3600000) / 60000);
                 const s = Math.floor((timeLeft % 60000) / 1000);
                 
-                timerEl.textContent = `الرجاء الانتظار: ${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-            }, 1000);
-        }
-        
-        // التحقق من حالة المستخدم
-        function checkUserStatus() {
-            showLoading();
+                elements.timerEl.textContent = `الرجاء الانتظار: ${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                setTimeout(updateTimer, 1000);
+            };
             
-            fetch(API_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    action: 'check_user',
-                    user_id: userId
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                updateUI(data.canSpin, data.lastTime);
-                hideLoading();
-            })
-            .catch(error => {
-                console.error('Error checking user:', error);
-                updateUI(true, null);
-                hideLoading();
-            });
+            updateTimer();
         }
         
-        // عرض/إخفاء شاشة التحميل
-        function showLoading() {
-            loadingEl.style.display = 'flex';
-        }
+        // ===== التهيئة =====
         
-        function hideLoading() {
-            loadingEl.style.display = 'none';
-        }
-        
-        // التهيئة
-        function init() {
-            createWheel();
+        async function init() {
+            showLoading("جاري تهيئة التطبيق...");
             
-            // محاولة الحصول على معرف المستخدم من Telegram
-            if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
-                Telegram.WebApp.ready();
-                const tgUser = Telegram.WebApp.initDataUnsafe.user;
-                if (tgUser && tgUser.id) {
-                    userId = tgUser.id;
+            try {
+                // إنشاء العجلة
+                createWheel();
+                
+                // الحصول على معرف المستخدم
+                if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
+                    Telegram.WebApp.ready();
+                    const tgUser = Telegram.WebApp.initDataUnsafe.user;
+                    if (tgUser && tgUser.id) {
+                        userId = tgUser.id;
+                        console.log("Telegram user ID:", userId);
+                    }
                 }
+                
+                // إذا لم يكن هناك معرف من Telegram
+                if (!userId) {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    userId = urlParams.get('user_id') || 'test_user_' + Math.floor(Math.random() * 10000);
+                }
+                
+                console.log("Using user ID:", userId);
+                
+                // التحقق من حالة المستخدم
+                await checkUserStatus();
+                
+                // إضافة مستمعي الأحداث
+                elements.spinBtn.addEventListener('click', spin);
+                elements.closeBtn.addEventListener('click', closeResult);
+                
+                hideLoading();
+                
+            } catch (error) {
+                console.error('Error in init:', error);
+                showError("خطأ في تهيئة التطبيق");
+                hideLoading();
             }
-            
-            // إذا لم يكن هناك معرف من Telegram، استخدم معرف من URL
-            if (!userId) {
-                const urlParams = new URLSearchParams(window.location.search);
-                userId = urlParams.get('user_id') || 'test_user_' + Math.floor(Math.random() * 10000);
-            }
-            
-            // التحقق من حالة المستخدم
-            checkUserStatus();
-            
-            // إضافة مستمعي الأحداث
-            spinBtn.addEventListener('click', spin);
-            closeBtn.addEventListener('click', closeResult);
         }
         
-        // بدء التطبيق عند تحميل الصفحة
+        // بدء التطبيق
         window.onload = init;
     </script>
 </body>
