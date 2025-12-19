@@ -31,7 +31,6 @@
         }
         .wheel {
             width: 100%; height: 100%; border-radius: 50%; position: relative; overflow: hidden;
-            /* تم تحديث دالة الانتقال هنا في دالة spin */
             box-shadow: 0 0 30px rgba(0,0,0,0.8), inset 0 0 25px rgba(0,0,0,0.6);
             border: 4px solid #444;
         }
@@ -121,7 +120,7 @@
 
         // --- الإعدادات الرئيسية ---
         // !!! هام: استبدل هذا بالرابط الجديد بعد نشر Google Apps Script !!!
-        const API_URL = "https://script.google.com/macros/s/AKfycbzQgxmN8RnN3-T1rzUcSGbi3fJw0HUF9YpHHToZ9OMJF0Z80o-RoWx5i4AjlpFGJkj-HQ/exec";
+        const API_URL = "https://script.google.com/macros/s/AKfycbxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/exec";
         
         const prizes = [
             { name: "حظ أوفر", probability: 40 }, { name: "1000", probability: 5 },
@@ -233,9 +232,11 @@
             
             const prizeCount = prizes.length;
             const prizeAngle = 360 / prizeCount;
-            const targetBaseAngle = (prizeAngle * selectedPrizeIndex) + (prizeAngle / 2);
+            const targetAngle = (prizeAngle * selectedPrizeIndex) + (prizeAngle / 2);
             const jitter = (Math.random() - 0.5) * (prizeAngle * 0.8);
-            const finalAngle = targetBaseAngle + jitter;
+            
+            // التصحيح الرئيسي: نطرح 90 درجة لمواءمة الزاوية مع المؤشر العلوي
+            const finalAngle = targetAngle + jitter - 90;
 
             const randomSpins = (Math.floor(Math.random() * 4) + 8) * 360;
             const totalRotation = randomSpins + finalAngle;
