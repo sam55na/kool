@@ -6,6 +6,7 @@
 <title>عجلة الحظ</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
+/* نفس الـ CSS السابق - لم يتغير */
 :root {
     --background-color: #121212;
     --text-color: #ffffff;
@@ -305,27 +306,26 @@ body {
 
 <script>
 // ===============================================================
-// FRONTEND JAVASCRIPT LOGIC
+// FRONTEND JAVASCRIPT LOGIC - الإصدار المصحح
 // ===============================================================
 
 // --- الإعدادات الرئيسية ---
-const API_URL = "https://script.google.com/macros/s/AKfycbz2-PqoTR5QJlwj7UYAlMzAeoLdiffT1Tl6LsY3EXcmvMAyrA6QVARPLzcN-avLNzqxpA/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbxbHj_2XrKa5QJTUNxXf9BQKnMAqCt_7vT1JZGrVgS5uRmfaNdCJ6J8sfgbAu1Kz26W0Q/exec";
 
-// الجوائز مع الاحتمالات (كل جائزة مكررة مرتين)
-// التوزيع الصحيح: حظ أوفر 44%، 1000: 10%، 2000: 4%، 5000: 2%
+// الجوائز مع الاحتمالات الصحيحة (لكل جائزة مكررة مرتين)
+// النسب المطلوبة: حظ أوفر 44%، 1000: 10%، 2000: 4%، 5000: 2%
 const prizes = [
-    { name: "حظ أوفر", probability: 44 },
-    { name: "حظ أوفر", probability: 44 },
-    { name: "1000", probability: 10 },
-    { name: "1000", probability: 10 },
-    { name: "2000", probability: 4 },
-    { name: "2000", probability: 4 },
-    { name: "5000", probability: 2 },
-    { name: "5000", probability: 2 }
+    { name: "حظ أوفر", probability: 22 }, // 22% × 2 = 44%
+    { name: "حظ أوفر", probability: 22 }, // 22% × 2 = 44%
+    { name: "1000", probability: 5 },     // 5% × 2 = 10%
+    { name: "1000", probability: 5 },     // 5% × 2 = 10%
+    { name: "2000", probability: 2 },     // 2% × 2 = 4%
+    { name: "2000", probability: 2 },     // 2% × 2 = 4%
+    { name: "5000", probability: 1 },     // 1% × 2 = 2%
+    { name: "5000", probability: 1 }      // 1% × 2 = 2%
 ];
-// المجموع: 120 (سيتم التعامل معه في selectPrize)
+// مجموع الاحتمالات: 60 (لكن كل قيمة تمثل النسبة الفعلية × 1)
 
-// الألوان للعجلة (8 ألوان لـ 8 قطاعات)
 const colors = ["#0d47a1", "#1565c0", "#1976d2", "#1e88e5", "#2196f3", "#42a5f5", "#64b5f6", "#90caf9"];
 
 // --- عناصر DOM ---
@@ -351,7 +351,6 @@ const ctx = elements.wheel.getContext('2d');
 let userId = null;
 let isSpinning = false;
 let canSpin = false;
-let currentRotation = 0;
 let timerInterval = null;
 let selectedPrizeIndex = 0;
 
@@ -371,7 +370,7 @@ const showError = (message) => {
     setTimeout(() => { elements.errorMessage.style.display = 'none'; }, 5000);
 };
 
-// --- وظائف العجلة (باستخدام Canvas) ---
+// --- وظائف العجلة ---
 const drawWheel = () => {
     const prizeCount = prizes.length;
     const prizeAngle = (2 * Math.PI) / prizeCount;
@@ -381,11 +380,8 @@ const drawWheel = () => {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     
-    // رسم القطاعات
     for (let i = 0; i < prizeCount; i++) {
         const angle = i * prizeAngle;
-        
-        // رسم القطاع
         ctx.fillStyle = colors[i % colors.length];
         ctx.beginPath();
         ctx.moveTo(300, 300);
@@ -393,23 +389,13 @@ const drawWheel = () => {
         ctx.closePath();
         ctx.fill();
         
-        // رسم النص في منتصف القطاع
         ctx.save();
-        ctx.fillStyle = '#ffffff'; // نص أبيض
+        ctx.fillStyle = '#ffffff';
         ctx.translate(300 + 200 * Math.cos(angle + prizeAngle / 2), 300 + 200 * Math.sin(angle + prizeAngle / 2));
         ctx.rotate(angle + prizeAngle / 2 + Math.PI / 2);
         ctx.fillText(prizes[i].name, 0, 0);
         ctx.restore();
     }
-    
-    // رسم مركز العجلة
-    ctx.fillStyle = '#212121';
-    ctx.beginPath();
-    ctx.arc(300, 300, 40, 0, 2 * Math.PI);
-    ctx.fill();
-    ctx.strokeStyle = '#424242';
-    ctx.lineWidth = 4;
-    ctx.stroke();
 };
 
 // --- وظائف الاتصال بالخادم ---
@@ -438,19 +424,28 @@ const checkUserStatus = async () => {
     if (data) {
         updateUI(data.canSpin, data.lastTime);
     } else {
-        // في حالة فشل الاتصال، اسمح بالتدوير لتجنب حظر المستخدم
         updateUI(true, null);
     }
 };
 
-// --- وظائف منطق اللعبة ---
+// --- التعديل المهم: دالة selectPrize المصححة ---
 const selectPrize = () => {
-    const totalProbability = 120; // مجموع الاحتمالات (44+44+10+10+4+4+2+2)
+    // مجموع الاحتمالات هو 100% (44+10+4+2 = 60، لكن كل جائزة مكررة)
+    // نحتاج لتحويل الاحتمالات إلى نسب مئوية صحيحة
+    const totalProbability = 100; // 100%
     const rand = Math.random() * totalProbability;
     let cumulativeProbability = 0;
     
+    // تحويل الاحتمالات إلى نسب مئوية حقيقية
+    const normalizedProbabilities = [
+        44/2, 44/2,   // حظ أوفر: 22% لكل واحدة
+        10/2, 10/2,   // 1000: 5% لكل واحدة
+        4/2, 4/2,     // 2000: 2% لكل واحدة
+        2/2, 2/2      // 5000: 1% لكل واحدة
+    ];
+    
     for (let i = 0; i < prizes.length; i++) {
-        cumulativeProbability += prizes[i].probability;
+        cumulativeProbability += normalizedProbabilities[i];
         if (rand <= cumulativeProbability) {
             selectedPrizeIndex = i;
             return i;
@@ -461,6 +456,7 @@ const selectPrize = () => {
     return selectedPrizeIndex;
 };
 
+// --- دالة spin المصححة ---
 const spin = async () => {
     if (isSpinning || !canSpin) return;
     
@@ -475,23 +471,20 @@ const spin = async () => {
     const sectorAngle = 360 / totalPrizes;
     
     // حساب الزاوية النهائية بدقة
-    // المؤشر في الأعلى (0 درجة)، لكن Canvas يبدأ من اليمين (90 درجة فرق)
-    // نحتاج لجعل القطاع المختار يصل إلى المؤشر في الأعلى
+    // نحتاج لجعل القطاع المختار يصل إلى المؤشر في الأعلى (0 درجة)
+    // المؤشر في 0 درجة (أعلى) لكن Canvas يبدأ من 90 درجة (يمين)
     
-    // زاوية بداية القطاع المختار
-    const startAngle = index * sectorAngle;
+    // زاوية منتصف القطاع المختار
+    const middleAngle = (index * sectorAngle) + (sectorAngle / 2);
     
-    // نريد منتصف القطاع ليصل إلى المؤشر (المؤشر في 270 درجة بالنسبة للـ Canvas)
+    // لأن العجلة تدور باتجاه عقارب الساعة في CSS
+    // نريد أن ينتهي الدوران عند الزاوية التي تجعل المؤشر على منتصف القطاع
     // الصيغة: (360 - (منتصف القطاع + 90)) + دورات كاملة
-    const middleAngle = startAngle + (sectorAngle / 2);
-    
-    // لأن العجلة تدور باتجاه عقارب الساعة، نحتاج لعكس الزاوية
-    // نريد أن ينتهي الدوران عند 270 درجة (أعلى المركز)
-    const targetAngle = 270 - middleAngle;
+    const targetStopAngle = 360 - (middleAngle + 90);
     
     // عدد الدورات الكاملة + الزاوية النهائية
     const spinCount = Math.floor(Math.random() * 4) + 8;
-    const totalRotation = (spinCount * 360) + targetAngle;
+    const totalRotation = (spinCount * 360) + targetStopAngle;
     
     // تطبيق الدوران
     elements.wheel.style.transition = 'transform 6s cubic-bezier(0.33, 1, 0.68, 1)';
@@ -517,7 +510,6 @@ const onSpinEnd = async (finalPrize) => {
         showResult(finalPrize);
     } else {
         showError("حدث خطأ أثناء حفظ نتيجتك. يرجى المحاولة مرة أخرى.");
-        // السماح للمستخدم بالمحاولة مرة أخرى
         updateUI(true, null);
     }
 };
@@ -530,14 +522,12 @@ const showResult = (prize) => {
 const closeResult = () => {
     elements.resultPopup.classList.remove('show');
     
-    // إذا كانت الجائزة "حظ أوفر"، تحديث الواجهة مباشرة
     if (elements.winPrize.textContent === "حظ أوفر") {
         setTimeout(() => {
             updateUI(false, new Date().getTime());
         }, 500);
     }
     
-    // إغلاق تطبيق Telegram إذا كان يعمل داخله
     if (window.Telegram && window.Telegram.WebApp) {
         setTimeout(() => {
             window.Telegram.WebApp.close();
