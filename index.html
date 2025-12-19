@@ -119,9 +119,8 @@
         // ========== FRONTEND JAVASCRIPT LOGIC ==========
         // ==============================================
 
-        // --- الإعدادات الرئيسية ---
         // !!! هام: استبدل هذا بالرابط الجديد بعد نشر Google Apps Script !!!
-        const API_URL = "https://script.google.com/macros/s/AKfycbzQgxmN8RnN3-T1rzUcSGbi3fJw0HUF9YpHHToZ9OMJF0Z80o-RoWx5i4AjlpFGJkj-HQ/exec";
+        const API_URL = "https://script.google.com/macros/s/AKfycbwZGsTQrzrYiVG-4XorxeUY82k1nM9AKDWp2ClK5fi7LN0kDZLWJ3c49uFNgVwVA4IvpA/exec";
         
         const prizes = [
             { name: "حظ أوفر", probability: 40 }, { name: "1000", probability: 5 },
@@ -152,7 +151,6 @@
         let userId = null;
         let isSpinning = false;
         let canSpin = false;
-        let currentRotation = 0;
         let timerInterval = null;
 
         // --- وظائف الواجهة ---
@@ -223,8 +221,8 @@
             }
         };
 
-        // --- وظائف الدوران (المعدلة لتصحيح الزاوية) ---
-        const spin = () => {
+        // --- وظائف منطق اللعبة ---
+        const spin = async () => {
             if (isSpinning || !canSpin) return;
 
             isSpinning = true;
@@ -233,42 +231,12 @@
             const selectedPrizeIndex = selectPrize();
             const prize = prizes[selectedPrizeIndex];
             
-            // ====================================================================
-            // التعديل: تصحيح حساب زاوية التوقف
-            // ====================================================================
-            const prizeCount = prizes.length;
-            const prizeAngle = 360 / prizeCount; // زاوية كل قطاع (45 درجة)
-            
-            // زاوية منتصف القطاع الفائز (بالدرجات، من اليمين وعكس عقارب الساعة)
-            const centerAngleOfPrize = (selectedPrizeIndex * prizeAngle) + (prizeAngle / 2);
-            
-            // الزاوية التي يجب أن تدورها العجلة لكي يصبح منتصف القطاع الفائز عند المؤشر (أعلى العجلة = 90 درجة)
-            // الدوران يكون في اتجاه عقارب الساعة (قيمة موجبة لـ rotate)
-            // الزاوية المطلوبة = 450 - centerAngleOfPrize
-            let rotationToAlign = 450 - centerAngleOfPrize;
-            
-            // إضافة إزاحة إضافية بمقدار نصف قطاع (22.5 درجة) لتعويض أي فرق في المحاذاة
-            // بناءً على الصورة، يبدو أن المؤشر يشير إلى منتصف الحد الفاصل بين القطاعات
-            // لكن بما أننا نريد أن يتوقف على منتصف القطاع، سنعتمد على الحساب الرياضي الصحيح
-            // وإذا استمرت المشكلة، سنضيف إزاحة تجريبية.
-            
-            // لنقم بتجربة إزاحة 45 درجة (قطاع كامل) للتأكد من الاتجاه
-            // rotationToAlign = rotationToAlign + 45; // تجربة إزاحة
-            
-            // تأكد من أن الزاوية ضمن نطاق 0-360
-            rotationToAlign = rotationToAlign % 360;
-            
-            // إضافة دورات كاملة لضمان الدوران الكافي
-            const fullSpins = 8; // عدد الدورات الكاملة
-            const finalRotation = (fullSpins * 360) + rotationToAlign;
-            
-            // إضافة تذبذب بسيط لتبدو الحركة طبيعية أكثر (اختياري)
-            const jitter = (Math.random() - 0.5) * (prizeAngle * 0.4); // تذبذب بحدود 40% من زاوية القطاع
-            const totalRotation = finalRotation + jitter;
-            
-            // ====================================================================
-            // نهاية التعديل
-            // ====================================================================
+            const prizeAngle = 360 / prizes.length;
+            const randomSpins = Math.floor(Math.random() * 4) + 8;
+            const targetAngle = (prizeAngle * selectedPrizeIndex) + (prizeAngle / 2);
+            const jitter = (Math.random() - 0.5) * (prizeAngle * 0.8);
+            const finalAngle = 360 - (targetAngle + jitter);
+            const totalRotation = (randomSpins * 360) + finalAngle;
 
             elements.wheel.style.transition = 'transform 6s cubic-bezier(0.33, 1, 0.68, 1)';
             elements.wheel.style.transform = `rotate(${totalRotation}deg)`;
