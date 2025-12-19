@@ -1,356 +1,585 @@
 <!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>عجلة الحظ اليومية</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style>
-        :root {
-            --background-color: #121212; --text-color: #ffffff; --primary-color: #fdd835;
-            --secondary-color: #212121; --disabled-color: #616161; --shadow-color: rgba(0, 0, 0, 0.5);
-        }
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        html, body { height: 100%; width: 100%; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background: var(--background-color) url('https://i.postimg.cc/W1k4wg9b/Picsart-25-12-16-19-26-45-331.jpg') no-repeat center center fixed;
-            background-size: cover; color: var(--text-color); min-height: 100vh;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            padding: 15px; overflow: hidden; position: relative;
-        }
-        .container { max-width: 400px; width: 100%; text-align: center; background: transparent; border-radius: 20px; padding: 20px; }
-        .header { margin-bottom: 20px; }
-        .status { font-size: 18px; font-weight: 500; color: #e0e0e0; height: 24px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
-        .timer { font-size: 16px; color: var(--primary-color); height: 20px; font-weight: bold; }
-        .wheel-container { position: relative; width: 300px; height: 300px; margin: 25px auto; }
-        .pointer {
-            position: absolute; top: -15px; left: 50%; transform: translateX(-50%);
-            width: 0; height: 0; border-left: 25px solid transparent; border-right: 25px solid transparent;
-            border-top: 40px solid var(--primary-color); z-index: 10; filter: drop-shadow(0 5px 8px var(--shadow-color));
-        }
-        .wheel {
-            width: 100%; height: 100%; border-radius: 50%; position: relative; overflow: hidden;
-            transition: transform 6s cubic-bezier(0.33, 1, 0.68, 1);
-            box-shadow: 0 0 30px rgba(0,0,0,0.8), inset 0 0 25px rgba(0,0,0,0.6);
-            border: 4px solid #444;
-        }
-        .wheel-center {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 80px; height: 80px; background: var(--secondary-color); border-radius: 50%;
-            display: flex; align-items: center; justify-content: center; text-align: center;
-            font-size: 20px; font-weight: bold; color: var(--primary-color); z-index: 5;
-            border: 4px solid #424242; text-shadow: 0 0 8px var(--primary-color);
-        }
-        .spin-btn {
-            background: linear-gradient(180deg, #fdd835, #f9a825); color: var(--secondary-color);
-            border: none; padding: 16px 45px; font-size: 22px; font-weight: bold;
-            border-radius: 50px; cursor: pointer; margin-top: 25px; transition: all 0.2s ease;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.4); width: 80%; max-width: 300px;
-        }
-        .spin-btn:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(253, 216, 53, 0.3); }
-        .spin-btn:disabled { background: var(--disabled-color); color: #9e9e9e; cursor: not-allowed; box-shadow: none; }
-        .result-popup {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85);
-            backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center;
-            z-index: 1000; opacity: 0; visibility: hidden; transition: opacity 0.4s, visibility 0.4s;
-        }
-        .result-popup.show { opacity: 1; visibility: visible; }
-        .result-content {
-            background: #333; padding: 35px; border-radius: 20px; text-align: center;
-            max-width: 90%; width: 360px; border: 2px solid var(--primary-color);
-            transform: scale(0.8); transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        .result-popup.show .result-content { transform: scale(1); }
-        .prize-text { font-size: 48px; color: var(--primary-color); margin: 20px 0; font-weight: bold; animation: prize-pulse 1.5s infinite; }
-        @keyframes prize-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
-        .close-btn {
-            background: var(--primary-color); color: var(--secondary-color); border: none;
-            padding: 12px 35px; font-size: 18px; border-radius: 50px; cursor: pointer; font-weight: bold; margin-top: 15px;
-        }
-        .loading-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85);
-            backdrop-filter: blur(10px); display: flex; flex-direction: column; align-items: center;
-            justify-content: center; z-index: 9999; opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s;
-        }
-        .loading-overlay.show { opacity: 1; visibility: visible; }
-        .loader {
-            width: 80px; height: 80px; border: 5px solid rgba(253, 216, 53, 0.3);
-            border-radius: 50%; border-top: 5px solid var(--primary-color); animation: spin 1s linear infinite; margin-bottom: 20px;
-        }
-        .loading-text { color: var(--primary-color); font-size: 18px; font-weight: bold; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .error-message {
-            background: rgba(244, 67, 54, 0.1); border: 1px solid #f44336; color: #ff8a80;
-            padding: 10px; border-radius: 10px; margin: 10px 0; display: none;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>عجلة الحظ</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root {
+    --background-color: #121212;
+    --text-color: #ffffff;
+    --primary-color: #fdd835;
+    --secondary-color: #212121;
+    --disabled-color: #616161;
+    --shadow-color: rgba(0, 0, 0, 0.5);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+    height: 100%;
+    width: 100%;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: var(--background-color) url('https://i.postimg.cc/W1k4wg9b/Picsart-25-12-16-19-26-45-331.jpg') no-repeat center center fixed;
+    background-size: cover;
+    color: var(--text-color);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 15px;
+    overflow: hidden;
+    position: relative;
+}
+
+.container {
+    max-width: 400px;
+    width: 100%;
+    text-align: center;
+    background: transparent;
+    border-radius: 20px;
+    padding: 20px;
+}
+
+.header {
+    margin-bottom: 20px;
+}
+
+.status {
+    font-size: 18px;
+    font-weight: 500;
+    color: #e0e0e0;
+    height: 24px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+.timer {
+    font-size: 16px;
+    color: var(--primary-color);
+    height: 20px;
+    font-weight: bold;
+}
+
+.wheel-container {
+    position: relative;
+    width: 300px;
+    height: 300px;
+    margin: 25px auto;
+}
+
+.pointer {
+    position: absolute;
+    top: -15px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 25px solid transparent;
+    border-right: 25px solid transparent;
+    border-top: 40px solid var(--primary-color);
+    z-index: 10;
+    filter: drop-shadow(0 5px 8px var(--shadow-color));
+}
+
+.wheel {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    position: relative;
+    overflow: hidden;
+    transition: transform 6s cubic-bezier(0.33, 1, 0.68, 1);
+    box-shadow: 0 0 30px rgba(0,0,0,0.8), inset 0 0 25px rgba(0,0,0,0.6);
+    border: 4px solid #444;
+}
+
+.wheel-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80px;
+    height: 80px;
+    background: var(--secondary-color);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 20px;
+    font-weight: bold;
+    color: var(--primary-color);
+    z-index: 5;
+    border: 4px solid #424242;
+    text-shadow: 0 0 8px var(--primary-color);
+}
+
+.spin-btn {
+    background: linear-gradient(180deg, #fdd835, #f9a825);
+    color: var(--secondary-color);
+    border: none;
+    padding: 16px 45px;
+    font-size: 22px;
+    font-weight: bold;
+    border-radius: 50px;
+    cursor: pointer;
+    margin-top: 25px;
+    transition: all 0.2s ease;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+    width: 80%;
+    max-width: 300px;
+}
+
+.spin-btn:hover:not(:disabled) {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(253, 216, 53, 0.3);
+}
+
+.spin-btn:disabled {
+    background: var(--disabled-color);
+    color: #9e9e9e;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.result-popup {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.4s, visibility 0.4s;
+}
+
+.result-popup.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.result-content {
+    background: #333;
+    padding: 35px;
+    border-radius: 20px;
+    text-align: center;
+    max-width: 90%;
+    width: 360px;
+    border: 2px solid var(--primary-color);
+    transform: scale(0.8);
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.result-popup.show .result-content {
+    transform: scale(1);
+}
+
+.prize-text {
+    font-size: 48px;
+    color: var(--primary-color);
+    margin: 20px 0;
+    font-weight: bold;
+    animation: prize-pulse 1.5s infinite;
+}
+
+@keyframes prize-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+.close-btn {
+    background: var(--primary-color);
+    color: var(--secondary-color);
+    border: none;
+    padding: 12px 35px;
+    font-size: 18px;
+    border-radius: 50px;
+    cursor: pointer;
+    font-weight: bold;
+    margin-top: 15px;
+}
+
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+}
+
+.loading-overlay.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.loader {
+    width: 80px;
+    height: 80px;
+    border: 5px solid rgba(253, 216, 53, 0.3);
+    border-radius: 50%;
+    border-top: 5px solid var(--primary-color);
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+}
+
+.loading-text {
+    color: var(--primary-color);
+    font-size: 18px;
+    font-weight: bold;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.error-message {
+    background: rgba(244, 67, 54, 0.1);
+    border: 1px solid #44336;
+    color: #ff8a80;
+    padding: 10px;
+    border-radius: 10px;
+    margin: 10px 0;
+    display: none;
+}
+</style>
 </head>
 <body>
-    <div class="loading-overlay" id="loadingOverlay">
-        <div class="loader"></div>
-        <div class="loading-text" id="loadingText"></div>
-    </div>
-    <div class="error-message" id="errorMessage"></div>
-    <div class="container">
-        <div class="header">
-            <div class="status" id="status"></div>
-            <div class="timer" id="timer"></div>
-        </div>
-        <div class="wheel-container">
-            <div class="pointer"></div>
-            <canvas id="wheel" width="600" height="600" style="width: 300px; height: 300px;"></canvas>
-            <div class="wheel-center" id="prizeDisplay">?</div>
-        </div>
-        <button class="spin-btn" id="spinBtn" disabled></button>
-    </div>
-    <div class="result-popup" id="resultPopup">
-        <div class="result-content">
-            <h2 style="font-size: 32px;">🎉 تهانينا!</h2>
-            <p style="font-size: 18px; margin-top: 10px;">لقد فزت بـ:</p>
-            <div class="prize-text" id="winPrize"></div>
-            <p style="font-size: 14px; color: #bdbdbd;" id="resultMessage"></p>
-            <button class="close-btn" id="closeBtn">إغلاق</button>
-        </div>
-    </div>
 
-    <script>
-        // ==============================================
-        // ========== FRONTEND JAVASCRIPT LOGIC ==========
-        // ==============================================
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loader"></div>
+    <div class="loading-text" id="loadingText"></div>
+</div>
 
-        // !!! هام: استبدل هذا بالرابط الجديد بعد نشر Google Apps Script !!!
-        const API_URL = "https://script.google.com/macros/s/AKfycbwZGsTQrzrYiVG-4XorxeUY82k1nM9AKDWp2ClK5fi7LN0kDZLWJ3c49uFNgVwVA4IvpA/exec";
+<div class="error-message" id="errorMessage"></div>
+
+<div class="container">
+    <div class="header">
+        <div class="status" id="status"></div>
+        <div class="timer" id="timer"></div>
+    </div>
+    
+    <div class="wheel-container">
+        <div class="pointer"></div>
+        <canvas id="wheel" width="600" height="600" style="width: 300px; height: 300px;"></canvas>
+        <div class="wheel-center" id="prizeDisplay"></div>
+    </div>
+    
+    <button class="spin-btn" id="spinBtn" disabled>جاري التحميل...</button>
+</div>
+
+<div class="result-popup" id="resultPopup">
+    <div class="result-content">
+        <h2 style="font-size: 32px;">🎉 مبروك! 🎉</h2>
+        <p id="resultMessage" style="font-size: 18px; margin-top: 10px;"></p>
+        <div class="prize-text" id="winPrize"></div>
+        <p style="font-size: 14px; color: #bdbdbd;" id="resultDetails"></p>
+        <button class="close-btn" id="closeBtn">موافق</button>
+    </div>
+</div>
+
+<script>
+// ===============================================================
+// FRONTEND JAVASCRIPT LOGIC
+// ===============================================================
+
+// --- الإعدادات الرئيسية ---
+// هام: استبدل هذا بالرابط الجديد بعد نشر Google Apps Script
+const API_URL = "https://script.google.com/macros/s/AKfycbz2-PqoTR5QJlwj7UYAlMzAeoLdiffT1Tl6LsY3EXcmvMAyrA6QVARPLzcN-avLNzqxpA/exec";
+
+// الجوائز مع الاحتمالات (كل جائزة مكررة مرتين)
+const prizes = [
+    { name: "حظ أوفر", probability: 44 },
+    { name: "حظ أوفر", probability: 44 },
+    { name: "1000", probability: 5 },
+    { name: "1000", probability: 5 },
+    { name: "2000", probability: 2 },
+    { name: "2000", probability: 2 },
+    { name: "5000", probability: 1 },
+    { name: "5000", probability: 1 }
+];
+
+// الألوان للعجلة
+const colors = ["#0d47a1", "#1565c0", "#1976d2", "#1e88e5", "#2196f3", "#42a5f5", "#64b5f6", "#90caf9"];
+
+// --- عناصر DOM ---
+const elements = {
+    wheel: document.getElementById('wheel'),
+    prizeDisplay: document.getElementById('prizeDisplay'),
+    spinBtn: document.getElementById('spinBtn'),
+    timerEl: document.getElementById('timer'),
+    statusEl: document.getElementById('status'),
+    resultPopup: document.getElementById('resultPopup'),
+    winPrize: document.getElementById('winPrize'),
+    closeBtn: document.getElementById('closeBtn'),
+    loadingOverlay: document.getElementById('loadingOverlay'),
+    loadingText: document.getElementById('loadingText'),
+    errorMessage: document.getElementById('errorMessage'),
+    resultMessage: document.getElementById('resultMessage'),
+    resultDetails: document.getElementById('resultDetails')
+};
+
+const ctx = elements.wheel.getContext('2d');
+
+// --- متغيرات الحالة ---
+let userId = null;
+let isSpinning = false;
+let canSpin = false;
+let currentRotation = 0;
+let timerInterval = null;
+
+// --- وظائف الواجهة ---
+const showLoading = (text) => {
+    elements.loadingText.textContent = text;
+    elements.loadingOverlay.classList.add('show');
+};
+
+const hideLoading = () => {
+    elements.loadingOverlay.classList.remove('show');
+};
+
+const showError = (message) => {
+    elements.errorMessage.textContent = message;
+    elements.errorMessage.style.display = 'block';
+    setTimeout(() => { elements.errorMessage.style.display = 'none'; }, 5000);
+};
+
+// --- وظائف العجلة (باستخدام Canvas) ---
+const drawWheel = () => {
+    const prizeCount = prizes.length;
+    const prizeAngle = (2 * Math.PI) / prizeCount;
+    
+    ctx.clearRect(0, 0, 600, 600);
+    ctx.font = 'bold 28px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    for (let i = 0; i < prizeCount; i++) {
+        const angle = i * prizeAngle;
+        ctx.fillStyle = colors[i % colors.length];
+        ctx.beginPath();
+        ctx.moveTo(300, 300);
+        ctx.arc(300, 300, 300, angle, angle + prizeAngle);
+        ctx.closePath();
+        ctx.fill();
         
-        const prizes = [
-            { name: "حظ أوفر", probability: 40 }, { name: "1000", probability: 5 },
-            { name: "2000", probability: 2 }, { name: "5000", probability: 1 },
-            { name: "1000", probability: 5 }, { name: "2000", probability: 2 },
-            { name: "5000", probability: 1 }, { name: "حظ أوفر", probability: 44 }
-        ];
-        const colors = ["#0d47a1", "#ffffff"];
+        ctx.save();
+        ctx.fillStyle = (ctx.fillStyle === '#ffffff') ? '#0d47a1' : '#ffffff';
+        ctx.translate(300 + 200 * Math.cos(angle + prizeAngle / 2), 300 + 200 * Math.sin(angle + prizeAngle / 2));
+        ctx.rotate(angle + prizeAngle / 2 + Math.PI / 2);
+        ctx.fillText(prizes[i].name, 0, 0);
+        ctx.restore();
+    }
+};
 
-        // --- عناصر DOM ---
-        const elements = {
-            wheel: document.getElementById('wheel'),
-            prizeDisplay: document.getElementById('prizeDisplay'),
-            spinBtn: document.getElementById('spinBtn'),
-            timerEl: document.getElementById('timer'),
-            statusEl: document.getElementById('status'),
-            resultPopup: document.getElementById('resultPopup'),
-            winPrize: document.getElementById('winPrize'),
-            closeBtn: document.getElementById('closeBtn'),
-            loadingOverlay: document.getElementById('loadingOverlay'),
-            loadingText: document.getElementById('loadingText'),
-            errorMessage: document.getElementById('errorMessage'),
-            resultMessage: document.getElementById('resultMessage')
-        };
-        const ctx = elements.wheel.getContext('2d');
+// --- وظائف الاتصال بالخادم ---
+const apiCall = async (action, payload) => {
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action, ...payload })
+        });
+        
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return await response.json();
+    } catch (error) {
+        console.error('API call failed for action "${action}":', error);
+        showError("خطأ في الاتصال بالخادم، حاول مرة أخرى.");
+        return null;
+    }
+};
 
-        // --- متغيرات الحالة ---
-        let userId = null;
-        let isSpinning = false;
-        let canSpin = false;
-        let timerInterval = null;
+const checkUserStatus = async () => {
+    showLoading("جاري التحقق من حالتك...");
+    const data = await apiCall('check_user', { user_id: userId });
+    hideLoading();
+    
+    if (data) {
+        updateUI(data.canSpin, data.lastTime);
+    } else {
+        // في حالة فشل الاتصال، اسمح بالتدوير لتجنب حظر المستخدم
+        updateUI(true, null);
+    }
+};
 
-        // --- وظائف الواجهة ---
-        const showLoading = (text) => {
-            elements.loadingText.textContent = text;
-            elements.loadingOverlay.classList.add('show');
-        };
-        const hideLoading = () => elements.loadingOverlay.classList.remove('show');
-        const showError = (message) => {
-            elements.errorMessage.textContent = message;
-            elements.errorMessage.style.display = 'block';
-            setTimeout(() => { elements.errorMessage.style.display = 'none'; }, 5000);
-        };
+// --- وظائف منطق اللعبة ---
+const spin = async () => {
+    if (isSpinning || !canSpin) return;
+    
+    isSpinning = true;
+    updateUI(false, null);
+    
+    const selectedPrizeIndex = selectPrize();
+    const prize = prizes[selectedPrizeIndex];
+    
+    const prizeAngle = 360 / prizes.length;
+    // زاوية منتصف القطاع
+    const targetAngle = prizeAngle * selectedPrizeIndex + prizeAngle / 2;
+    // دوران إضافي لجعل العجلة تدور عدة مرات
+    const randomSpins = Math.floor(Math.random() * 4) + 8;
+    // الزاوية النهائية مع تعويض الدوران العكسي
+    const finalAngle = 360 - targetAngle;
+    // الدوران الكلي
+    const totalRotation = (randomSpins * 360) + finalAngle;
+    
+    elements.wheel.style.transition = 'transform 6s cubic-bezier(0.33, 1, 0.68, 1)';
+    elements.wheel.style.transform = `rotate(${totalRotation}deg)`;
+    
+    elements.wheel.addEventListener('transitionend', () => onSpinEnd(prize.name), { once: true });
+};
 
-        // --- وظائف العجلة (باستخدام Canvas) ---
-        const drawWheel = () => {
-            const prizeCount = prizes.length;
-            const prizeAngle = (2 * Math.PI) / prizeCount;
-            ctx.clearRect(0, 0, 600, 600);
-            ctx.font = 'bold 30px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
+const onSpinEnd = async (finalPrize) => {
+    isSpinning = false;
+    elements.prizeDisplay.textContent = finalPrize;
+    
+    const data = await apiCall('save_spin', { user_id: userId, prize: finalPrize });
+    
+    if (finalPrize === "حظ أوفر") {
+        elements.resultMessage.textContent = "حظ أوفر في المرة القادمة!";
+        elements.resultDetails.textContent = "جرب حظك مرة أخرى بعد 24 ساعة";
+        showResult(finalPrize);
+    } else if (data && data.success) {
+        elements.resultMessage.textContent = `🎉 لقد ربحت ${finalPrize}! 🎉`;
+        elements.resultDetails.textContent = "سيتم إرسال جائزتك إلى بوت التليجرام لتفعيلها.";
+        showResult(finalPrize);
+    } else {
+        showError("حدث خطأ أثناء حفظ نتيجتك. يرجى المحاولة مرة أخرى.");
+        // السماح للمستخدم بالمحاولة مرة أخرى
+        updateUI(true, null);
+    }
+};
 
-            for (let i = 0; i < prizeCount; i++) {
-                const angle = i * prizeAngle;
-                ctx.fillStyle = colors[i % colors.length];
-                ctx.beginPath();
-                ctx.moveTo(300, 300);
-                ctx.arc(300, 300, 300, angle, angle + prizeAngle);
-                ctx.closePath();
-                ctx.fill();
+const selectPrize = () => {
+    const rand = Math.random() * 100;
+    let cumulativeProbability = 0;
+    
+    for (let i = 0; i < prizes.length; i++) {
+        cumulativeProbability += prizes[i].probability;
+        if (rand <= cumulativeProbability) return i;
+    }
+    
+    return prizes.length - 1;
+};
 
-                ctx.save();
-                ctx.fillStyle = (ctx.fillStyle === '#ffffff') ? '#0d47a1' : '#ffffff';
-                ctx.translate(300 + 200 * Math.cos(angle + prizeAngle / 2), 300 + 200 * Math.sin(angle + prizeAngle / 2));
-                ctx.rotate(angle + prizeAngle / 2 + Math.PI / 2);
-                ctx.fillText(prizes[i].name, 0, 0);
-                ctx.restore();
-            }
-        };
+const showResult = (prize) => {
+    elements.winPrize.textContent = prize;
+    elements.resultPopup.classList.add('show');
+};
 
-        // --- وظائف الاتصال بالخادم ---
-        const apiCall = async (action, payload = {}) => {
-            try {
-                const response = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // لتجنب طلب CORS preflight
-                    body: JSON.stringify({ action, ...payload })
-                });
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                return await response.json();
-            } catch (error) {
-                console.error(`API call failed for action "${action}":`, error);
-                showError("خطأ في الاتصال بالخادم. حاول مرة أخرى.");
-                return null;
-            }
-        };
-
-        const checkUserStatus = async () => {
-            showLoading("جاري التحقق من حالتك...");
-            const data = await apiCall('check_user', { user_id: userId });
-            hideLoading();
-            if (data) {
-                updateUI(data.canSpin, data.lastTime);
-            } else {
-                // في حالة فشل الاتصال، اسمح بالتدوير لتجنب حظر المستخدم
-                updateUI(true, null);
-            }
-        };
-
-        // --- وظائف منطق اللعبة ---
-        const spin = async () => {
-            if (isSpinning || !canSpin) return;
-
-            isSpinning = true;
-            updateUI(false, null); // تعطيل الزر فوراً
-
-            const selectedPrizeIndex = selectPrize();
-            const prize = prizes[selectedPrizeIndex];
-            
-            const prizeAngle = 360 / prizes.length;
-            const randomSpins = Math.floor(Math.random() * 4) + 8;
-            const targetAngle = (prizeAngle * selectedPrizeIndex) + (prizeAngle / 2);
-            const jitter = (Math.random() - 0.5) * (prizeAngle * 0.8);
-            const finalAngle = 360 - (targetAngle + jitter);
-            const totalRotation = (randomSpins * 360) + finalAngle;
-
-            elements.wheel.style.transition = 'transform 6s cubic-bezier(0.33, 1, 0.68, 1)';
-            elements.wheel.style.transform = `rotate(${totalRotation}deg)`;
-
-            elements.wheel.addEventListener('transitionend', () => onSpinEnd(prize.name), { once: true });
-        };
-
-        const onSpinEnd = async (finalPrize) => {
-            isSpinning = false;
-            elements.prizeDisplay.textContent = finalPrize;
-            
-            const data = await apiCall('save_spin', { user_id: userId, prize: finalPrize });
-
-            if (finalPrize === "حظ أوفر") {
-                elements.resultMessage.textContent = "حظ أوفر في المرة القادمة!";
-                showResult(finalPrize);
-            } else if (data && data.success) {
-                elements.resultMessage.textContent = "سيتم إرسال جائزتك إلى البوت لتفعيلها.";
-                showResult(finalPrize);
-            } else {
-                showError("حدث خطأ أثناء حفظ نتيجتك. يرجى المحاولة مرة أخرى لاحقًا.");
-                updateUI(true, null); // السماح للمستخدم بالمحاولة مرة أخرى
-            }
-        };
-
-        const selectPrize = () => {
-            const rand = Math.random() * 100;
-            let cumulativeProbability = 0;
-            for (let i = 0; i < prizes.length; i++) {
-                cumulativeProbability += prizes[i].probability;
-                if (rand <= cumulativeProbability) return i;
-            }
-            return prizes.length - 1;
-        };
-
-        const showResult = (prize) => {
-            elements.winPrize.textContent = prize;
-            elements.resultPopup.classList.add('show');
-        };
-
-        const closeResult = () => {
-            elements.resultPopup.classList.remove('show');
+const closeResult = () => {
+    elements.resultPopup.classList.remove('show');
+    
+    if (finalPrize === "حظ أوفر") {
+        setTimeout(() => {
             updateUI(false, new Date().getTime());
-            setTimeout(() => {
-                if (window.Telegram && window.Telegram.WebApp) {
-                    window.Telegram.WebApp.close();
-                }
-            }, 500);
-        };
+        }, 500);
+    }
+    
+    if (window.Telegram && window.Telegram.WebApp) {
+        setTimeout(() => {
+            window.Telegram.WebApp.close();
+        }, 500);
+    }
+};
 
-        // --- وظائف تحديث الواجهة ---
-        const updateUI = (canSpinNow, lastTime) => {
-            canSpin = canSpinNow;
-            if (canSpinNow) {
-                elements.spinBtn.disabled = false;
-                elements.spinBtn.textContent = "دور العجلة";
-                elements.statusEl.textContent = "عجلة الحظ اليومية";
-                elements.timerEl.textContent = "";
-                if (timerInterval) clearInterval(timerInterval);
-            } else {
-                elements.spinBtn.disabled = true;
-                elements.spinBtn.textContent = "ارجع غداً";
-                elements.statusEl.textContent = "لقد قمت بالتدوير بالفعل اليوم";
-                if (lastTime) startTimer(lastTime);
-            }
-        };
+// --- وظائف تحديث الواجهة ---
+const updateUI = (canSpinNow, lastTime) => {
+    canSpin = canSpinNow;
+    
+    if (canSpinNow) {
+        elements.spinBtn.disabled = false;
+        elements.spinBtn.textContent = "دور العجلة";
+        elements.statusEl.textContent = "عجلة الحظ اليومية";
+        elements.timerEl.textContent = "";
+        if (timerInterval) clearInterval(timerInterval);
+    } else {
+        elements.spinBtn.disabled = true;
+        elements.spinBtn.textContent = "ارجع غداً";
+        elements.statusEl.textContent = "لقد قمت بالتدوير بالفعل اليوم";
+        if (lastTime) startTimer(lastTime);
+    }
+};
 
-        const startTimer = (lastTime) => {
-            if (timerInterval) clearInterval(timerInterval);
-            const targetTime = lastTime + (24 * 60 * 60 * 1000);
+const startTimer = (lastTime) => {
+    if (timerInterval) clearInterval(timerInterval);
+    
+    const targetTime = lastTime + (24 * 60 * 60 * 1000);
+    
+    const update = () => {
+        const timeLeft = targetTime - Date.now();
+        
+        if (timeLeft <= 0) {
+            clearInterval(timerInterval);
+            updateUI(true, null);
+            return;
+        }
+        
+        const h = Math.floor(timeLeft / 3600000);
+        const m = Math.floor((timeLeft % 3600000) / 60000);
+        const s = Math.floor((timeLeft % 60000) / 1000);
+        
+        elements.timerEl.textContent = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    };
+    
+    update();
+    timerInterval = setInterval(update, 1000);
+};
 
-            const update = () => {
-                const timeLeft = targetTime - Date.now();
-                if (timeLeft <= 0) {
-                    clearInterval(timerInterval);
-                    updateUI(true, null);
-                    return;
-                }
-                const h = Math.floor(timeLeft / 3600000);
-                const m = Math.floor((timeLeft % 3600000) / 60000);
-                const s = Math.floor((timeLeft % 60000) / 1000);
-                elements.timerEl.textContent = `العودة بعد: ${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-            };
-            update();
-            timerInterval = setInterval(update, 1000);
-        };
+// --- التهيئة ---
+const init = async () => {
+    showLoading("جاري تهيئة التطبيق...");
+    drawWheel();
+    
+    try {
+        if (window.Telegram && window.Telegram.WebApp) {
+            Telegram.WebApp.ready();
+            const tgUser = Telegram.WebApp.initDataUnsafe.user;
+            if (tgUser && tgUser.id) userId = tgUser.id;
+        }
+        
+        if (!userId) {
+            userId = new URLSearchParams(window.location.search).get('user_id') || "test_user_12345";
+        }
+        
+        elements.spinBtn.addEventListener('click', spin);
+        elements.closeBtn.addEventListener('click', closeResult);
+        
+        await checkUserStatus();
+    } catch (error) {
+        console.error('Initialization failed.', error);
+        showError("فشل في تهيئة التطبيق.");
+    } finally {
+        hideLoading();
+    }
+};
 
-        // --- التهيئة ---
-        const init = async () => {
-            showLoading("جاري تهيئة التطبيق...");
-            drawWheel(); // رسم العجلة باستخدام Canvas
-
-            try {
-                if (window.Telegram && window.Telegram.WebApp) {
-                    Telegram.WebApp.ready();
-                    const tgUser = Telegram.WebApp.initDataUnsafe.user;
-                    if (tgUser && tgUser.id) userId = tgUser.id;
-                }
-                if (!userId) {
-                    userId = new URLSearchParams(window.location.search).get('user_id') || 'test_user_12345';
-                }
-                
-                elements.spinBtn.addEventListener('click', spin);
-                elements.closeBtn.addEventListener('click', closeResult);
-                
-                await checkUserStatus();
-            } catch (error) {
-                console.error('Initialization failed:', error);
-                showError("فشل في تهيئة التطبيق.");
-                hideLoading();
-            }
-        };
-
-        window.onload = init;
-    </script>
+window.onload = init;
+</script>
 </body>
 </html>
