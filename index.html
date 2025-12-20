@@ -478,7 +478,7 @@
         };
         
         const checkUserStatus = async () => {
-            showLoading("جاري التحقق من حالتك...");
+            showLoading("يتم التحقق");
             const data = await apiCall('check_user', { user_id: userId });
             hideLoading();
             
@@ -567,13 +567,13 @@
             
             if (canSpinNow) {
                 elements.spinBtn.disabled = false;
-                elements.spinBtn.textContent = "دور العجلة";
-                elements.statusEl.textContent = "عجلة الحظ اليومية";
+                elements.spinBtn.textContent = "SPIN";
+                elements.statusEl.textContent = "SPINIX WHEEL";
                 elements.timerEl.textContent = "";
                 if (timerInterval) clearInterval(timerInterval);
             } else {
                 elements.spinBtn.disabled = true;
-                elements.spinBtn.textContent = "رجع غداً";
+                elements.spinBtn.textContent = "عد لاحقا";
                 elements.statusEl.textContent = "لقد قمت بالتدوير بالفعل اليوم";
                 if (lastTime) startTimer(lastTime);
             }
@@ -606,34 +606,37 @@
         
         // -- التهيئة -- //
         const init = async () => {
-            showLoading("جاري تهيئة التطبيق...");
-            
-            // رسم العجلة باستخدام Canvas
+            showLoading("...جاري تهيئة التطبيق.");
             drawWheel();
-            
+
+            // الحصول على معرف المستخدم من رابط URL فقط
+            userId = new URLSearchParams(window.location.search).get('user_id');
+
+            // إذا لم يتم العثور على معرف المستخدم في الرابط، أظهر رسالة خطأ
+            if (!userId) {
+                hideLoading();
+                showError("العجلة غير متاحة. معرف المستخدم غير موجود في الرابط.");
+                // تعطيل زر الدوران ومنع أي تفاعل
+                elements.spinBtn.disabled = true;
+                elements.spinBtn.textContent = "غير متاح";
+                elements.statusEl.textContent = "العجلة غير متاحة";
+                return; // توقف عن تنفيذ باقي التهيئة
+    }
+
+            // إذا وصلنا إلى هنا، يعني أن userId موجود
+            elements.spinBtn.addEventListener('click', spin);
+            elements.closeBtn.addEventListener('click', closeResult);
+    
             try {
-                if (window.Telegram && window.Telegram.WebApp) {
-                    Telegram.WebApp.ready();
-                    const tgUser = Telegram.WebApp.initDataUnsafe.user;
-                    if (tgUser && tgUser.id) userId = tgUser.id;
-                }
-                
-                if (!userId) {
-                    userId = new URLSearchParams(window.location.search).get('user_id') || "test_user_12345";
-                }
-                
-                elements.spinBtn.addEventListener('click', spin);
-                elements.closeBtn.addEventListener('click', closeResult);
-                
                 await checkUserStatus();
             } catch (error) {
                 console.error('Initialization failed.', error);
                 showError("فشل في تهيئة التطبيق.");
             } finally {
                 hideLoading();
-            }
-        };
-        
+    }
+};
+
         window.onload = init;
     </script>
 </body>
