@@ -309,7 +309,7 @@
         
         // --- الإعدادات الرئيسية ---
         // III Google Apps Script هام: استبدل هذا بالرابط الجديد بعد نشر III //
-        const API_URL = "https://script.google.com/macros/s/AKfycbwwv7KsW40ogYZQSR-sS4B4108Dun0AzbiLCPJN0djoRKYo9g6_V5CC60ODAkWGabux9Q/exec";
+        const API_URL = "https://script.google.com/macros/s/AKfycbyaydo4w8GF3HgQ12C6m6DhmGKXuh0WGMsqOXuX8m6zvONoC2NSPBZ6xaVlYkg0f_Mj/exec";
         
         const prizes = [
             { name: "حظ أوفر", probability: 44 },
@@ -606,37 +606,34 @@
         
         // -- التهيئة -- //
         const init = async () => {
-            showLoading("...جاري تهيئة التطبيق.");
+            showLoading("جاري تهيئة التطبيق...");
+            
+            // رسم العجلة باستخدام Canvas
             drawWheel();
-
-            // الحصول على معرف المستخدم من رابط URL فقط
-            userId = new URLSearchParams(window.location.search).get('user_id');
-
-            // إذا لم يتم العثور على معرف المستخدم في الرابط، أظهر رسالة خطأ
-            if (!userId) {
-                hideLoading();
-                showError("العجلة غير متاحة. معرف المستخدم غير موجود في الرابط.");
-                // تعطيل زر الدوران ومنع أي تفاعل
-                elements.spinBtn.disabled = true;
-                elements.spinBtn.textContent = "غير متاح";
-                elements.statusEl.textContent = "العجلة غير متاحة";
-                return; // توقف عن تنفيذ باقي التهيئة
-    }
-
-            // إذا وصلنا إلى هنا، يعني أن userId موجود
-            elements.spinBtn.addEventListener('click', spin);
-            elements.closeBtn.addEventListener('click', closeResult);
-    
+            
             try {
+                if (window.Telegram && window.Telegram.WebApp) {
+                    Telegram.WebApp.ready();
+                    const tgUser = Telegram.WebApp.initDataUnsafe.user;
+                    if (tgUser && tgUser.id) userId = tgUser.id;
+                }
+                
+                if (!userId) {
+                    userId = new URLSearchParams(window.location.search).get('user_id') || "test_user_12345";
+                }
+                
+                elements.spinBtn.addEventListener('click', spin);
+                elements.closeBtn.addEventListener('click', closeResult);
+                
                 await checkUserStatus();
             } catch (error) {
                 console.error('Initialization failed.', error);
                 showError("فشل في تهيئة التطبيق.");
             } finally {
                 hideLoading();
-    }
-};
-
+            }
+        };
+        
         window.onload = init;
     </script>
 </body>
